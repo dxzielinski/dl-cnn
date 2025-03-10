@@ -15,8 +15,9 @@ default_transforms = transforms.Compose([
 no_transforms = transforms.Compose([transforms.ToTensor(),])
 
 class ClassificationDataset(torch.utils.data.Dataset):
-    def __init__(self, root, transform=None):
+    def __init__(self, root, transform=None, batch_size=32):
         self.dataset = ImageFolder(root, transform=transform)
+        self.batch_size = batch_size
     
     def __len__(self):
         return len(self.dataset)
@@ -27,4 +28,5 @@ class ClassificationDataset(torch.utils.data.Dataset):
     def get_classes(self):
         return self.dataset.classes
     
-
+    def get_dataloader(self):
+        return torch.utils.data.DataLoader(self, batch_size=self.batch_size, shuffle=True, num_workers=4)
