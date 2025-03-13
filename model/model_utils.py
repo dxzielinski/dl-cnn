@@ -29,12 +29,12 @@ class BasicCNN(torch.nn.Module):
     def forward(self, x):
         return self.model(x)
     
-    def fit(self, train_loader, device="cuda", epochs=10):
+    def fit(self, train_dataset, val_dataset, device="cuda", epochs=10):
         self.to(device)
         self.train()
         for epoch in range(epochs):
             running_loss = 0.0
-            for i, data in enumerate(train_loader, 0):
+            for i, data in enumerate(train_dataset.get_dataloader(), 0):
                 inputs, labels = data
                 self.optimizer.zero_grad()
                 # forward + backward + optimize
@@ -43,28 +43,34 @@ class BasicCNN(torch.nn.Module):
                 loss = self.criterion(outputs, labels)
                 loss.backward()
                 self.optimizer.step()
-
                 running_loss += loss.item()
                 if i % 2000 == 1999:
-                    print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 2000:.3f}')
+                    print(f'Epoch {epoch + 1}: Training loss: {running_loss / 2000:.3f}')
                     running_loss = 0.0
+                self.eval()
+                val_loss = 0.0
+                with torch.no_grad():
+                    for inputs, labels in val_dataset.get_dataloader():
+                        inputs, labels = inputs.to(device), labels.to(device)
+                        outputs = self(inputs)
+                        loss = self.criterion(outputs, labels)
+                        val_loss += loss.item()
+                avg_val_loss = val_loss / len(val_dataset.get_dataloader())
+                print(f'Epoch {epoch + 1}: Validation loss: {avg_val_loss:.3f}')
     
-    def evaluate(self, test_loader, device="cuda"):
+    def evaluate(self, test_dataset, device="cuda"):
         self.to(device)
         self.eval()
-        classes = test_loader.get_classes()
+        classes = test_dataset.get_classes()
         correct_pred = {classname: 0 for classname in classes}
         total_pred = {classname: 0 for classname in classes}
-
-        # again no gradients needed
         with torch.no_grad():
-            for data in test_loader:
+            for data in test_dataset.get_dataloader():
                 images, labels = data
                 labels = labels.to(device)
                 images = images.to(device)
                 outputs = self(images)
                 _, predictions = torch.max(outputs, 1)
-                # collect the correct predictions for each class
                 for label, prediction in zip(labels, predictions):
                     if label == prediction:
                         correct_pred[classes[label]] += 1
