@@ -50,6 +50,7 @@ class Model(L.LightningModule):
         super().__init__()
         self.model = BasicCNN(hyperparameters["dropout"])
         self.learning_rate = hyperparameters["learning_rate"]
+        self.loss_fn = torch.nn.CrossEntropyLoss()
         self.train_metrics = torchmetrics.MetricCollection(
             {
                 "f1_macro": torchmetrics.F1Score(
@@ -76,11 +77,11 @@ class Model(L.LightningModule):
 
     def on_train_start(self):
         if self.logger is not None:
-            self.logger.log_hyperparams(self.custom_hparams)
+            self.logger.log_hyperparams(self.hyperparameters)
 
     def on_test_start(self):
         if self.logger is not None:
-            self.logger.log_hyperparams(self.custom_hparams)
+            self.logger.log_hyperparams(self.hyperparameters)
 
     def forward(self, x):
         return self.model(x)
@@ -136,11 +137,19 @@ class Model(L.LightningModule):
         self.test_batch_outputs.clear()
 
     def configure_optimizers(self):
-        return torch.optim.AdamW(
+        return {
+            "optimizer": torch.optim.AdamW(
             self.model.parameters(),
             lr=self.learning_rate,
-            weight_decay=self.hyperparameters["weight_decay"],
-        )
+            weight_decay=self.hyperparameters["weight_decay"],),
+            "lr_scheduler": 
+                {"scheduler": torch.optim.lr_scheduler.CyclicLR(
+                optimizer=self.optimizers(),
+                base_lr=self.learning_rate / 10,
+                max_lr = self.learning_rate * 10,),
+                 "monitor": "val_loss",
+                }
+        }
         
 
 default_transforms = transforms.Compose([
@@ -149,9 +158,9 @@ default_transforms = transforms.Compose([
     transforms.RandomRotation(degrees=20),
     transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
     # hue shifts color around the RGB color wheel. +-0.05 * 365deg ~= +-18deg
+    transforms.ToTensor(),
     transforms.RandomErasing(p=0.5, scale=(0.005, 0.01), ratio=(1.2, 1.8)),  # cutout
     # 32*32 = 1024; 0.005 * 1024 ~= 5; 3x2 has ratio 1.5, so ratio can be 1.2-1.8
-    transforms.ToTensor(),
     transforms.Normalize(mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587])
 ])
 
@@ -169,7 +178,7 @@ class ClassificationData(L.LightningDataModule):
                 root=f"{self.data_dir}/train", transform=default_transforms
             )
             self.val_dataset = ImageFolder(
-                root=f"{self.data_dir}/val", transform=default_transforms
+                root=f"{self.data_dir}/valid", transform=default_transforms
             )
         if stage == "test":
             self.test_dataset = ImageFolder(
@@ -182,6 +191,7 @@ class ClassificationData(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=8,
+            persistent_workers=True
         )
 
     def val_dataloader(self):
@@ -190,6 +200,7 @@ class ClassificationData(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=8,
+            persistent_workers=True
         )
 
     def test_dataloader(self):
