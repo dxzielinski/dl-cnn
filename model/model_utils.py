@@ -137,16 +137,20 @@ class Model(L.LightningModule):
         self.test_batch_outputs.clear()
 
     def configure_optimizers(self):
-        return {
-            "optimizer": torch.optim.AdamW(
+        base_lr = self.learning_rate / 10
+        max_lr = self.learning_rate * 10
+        optimizer = torch.optim.AdamW(
             self.model.parameters(),
             lr=self.learning_rate,
-            weight_decay=self.hyperparameters["weight_decay"],),
+            weight_decay=self.hyperparameters["weight_decay"],
+        )
+        scheduler = torch.optim.lr_scheduler.CyclicLR(
+            optimizer=optimizer, base_lr=base_lr, max_lr=max_lr
+        )
+        return {
+            "optimizer": optimizer,
             "lr_scheduler": 
-                {"scheduler": torch.optim.lr_scheduler.CyclicLR(
-                optimizer=self.optimizers(),
-                base_lr=self.learning_rate / 10,
-                max_lr = self.learning_rate * 10,),
+                {"scheduler": scheduler,
                  "monitor": "val_loss",
                 }
         }
