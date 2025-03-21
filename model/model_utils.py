@@ -7,6 +7,7 @@ from torchvision.models.inception import inception_v3, Inception_V3_Weights
 from torchvision.models.mobilenet import mobilenet_v3_large, MobileNet_V3_Large_Weights
 
 from model_config import TASK, NUM_CLASSES
+from kan_convolutional.KANConv import KAN_Convolutional_Layer
 
 
 def _calc_conv_output_size(size=32, kernel_size=2, stride=1, padding=0, pooling_size=2):
@@ -28,7 +29,10 @@ class BasicCNN(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(2),
             torch.nn.Flatten(),
-            torch.nn.Linear(in_features=64 * _calc_conv_output_size(_calc_conv_output_size()) ** 2, out_features=64),
+            torch.nn.Linear(
+                in_features=64 * _calc_conv_output_size(_calc_conv_output_size()) ** 2,
+                out_features=64,
+            ),
             torch.nn.BatchNorm1d(64),
             torch.nn.ReLU(),
             torch.nn.Dropout(dropout),
@@ -151,33 +155,42 @@ class Model(L.LightningModule):
         )
         return {
             "optimizer": optimizer,
-            "lr_scheduler": 
-                {"scheduler": scheduler,
-                 "monitor": "val_loss",
-                }
+            "lr_scheduler": {
+                "scheduler": scheduler,
+                "monitor": "val_loss",
+            },
         }
-        
 
-default_transforms = transforms.Compose([
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomVerticalFlip(p=0.5),
-    transforms.RandomRotation(degrees=20),
-    transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
-    # hue shifts color around the RGB color wheel. +-0.05 * 365deg ~= +-18deg
-    transforms.ToTensor(),
-    transforms.RandomErasing(p=0.5, scale=(0.005, 0.01), ratio=(1.2, 1.8)),  # cutout
-    # 32*32 = 1024; 0.005 * 1024 ~= 5; 3x2 has ratio 1.5, so ratio can be 1.2-1.8
-    transforms.Normalize(mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587])
-])
 
-no_augmentation = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587])
-])
+default_transforms = transforms.Compose(
+    [
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomVerticalFlip(p=0.5),
+        transforms.RandomRotation(degrees=20),
+        transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
+        # hue shifts color around the RGB color wheel. +-0.05 * 365deg ~= +-18deg
+        transforms.ToTensor(),
+        transforms.RandomErasing(
+            p=0.5, scale=(0.005, 0.01), ratio=(1.2, 1.8)
+        ),  # cutout
+        # 32*32 = 1024; 0.005 * 1024 ~= 5; 3x2 has ratio 1.5, so ratio can be 1.2-1.8
+        transforms.Normalize(
+            mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587]
+        ),
+    ]
+)
+
+no_augmentation = transforms.Compose(
+    [
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587]
+        ),
+    ]
+)
 
 
 class ClassificationData(L.LightningDataModule):
-
     def __init__(self, data_dir="../data", batch_size=16, transform=default_transforms):
         super().__init__()
         self.data_dir = data_dir
@@ -203,7 +216,7 @@ class ClassificationData(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=8,
-            persistent_workers=True
+            persistent_workers=True,
         )
 
     def val_dataloader(self):
@@ -212,7 +225,7 @@ class ClassificationData(L.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=8,
-            persistent_workers=True
+            persistent_workers=True,
         )
 
     def test_dataloader(self):
@@ -222,37 +235,109 @@ class ClassificationData(L.LightningDataModule):
             shuffle=False,
             num_workers=8,
         )
-        
 
-inception_transforms = transforms.Compose([
-    transforms.Resize((299, 299)),
-    transforms.RandomHorizontalFlip(p=0.5),
-    transforms.RandomVerticalFlip(p=0.5),
-    transforms.RandomRotation(degrees=20),
-    transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
-    transforms.ToTensor(),
-    transforms.RandomErasing(p=0.5, scale=(0.005, 0.01), ratio=(1.2, 1.8)),
-    transforms.Normalize(mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587])
-])
 
-inception_no_augmentation = transforms.Compose([
-    transforms.Resize((299, 299)),
-    transforms.ToTensor(),
-    transforms.Normalize(mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587])
-])
+inception_transforms = transforms.Compose(
+    [
+        transforms.Resize((299, 299)),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomVerticalFlip(p=0.5),
+        transforms.RandomRotation(degrees=20),
+        transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
+        transforms.ToTensor(),
+        transforms.RandomErasing(p=0.5, scale=(0.005, 0.01), ratio=(1.2, 1.8)),
+        transforms.Normalize(
+            mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587]
+        ),
+    ]
+)
+
+inception_no_augmentation = transforms.Compose(
+    [
+        transforms.Resize((299, 299)),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587]
+        ),
+    ]
+)
 
 
 class PretrainedModelInception(Model):
-    def __init__(self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001):
-        super().__init__(hyperparameters={"learning_rate": learning_rate, "dropout": dropout, "weight_decay": weight_decay, "batch_size": batch_size})
+    def __init__(
+        self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001
+    ):
+        super().__init__(
+            hyperparameters={
+                "learning_rate": learning_rate,
+                "dropout": dropout,
+                "weight_decay": weight_decay,
+                "batch_size": batch_size,
+            }
+        )
         self.model = inception_v3(weights=Inception_V3_Weights.DEFAULT)
         self.model.aux_logits = False
         num_features = self.model.fc.in_features
         self.model.fc = torch.nn.Linear(num_features, NUM_CLASSES)
-            
+
+
 class PretrainedModelMobileNet(Model):
-    def __init__(self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001):
-        super().__init__(hyperparameters={"learning_rate": learning_rate, "dropout": dropout, "weight_decay": weight_decay, "batch_size": batch_size})
+    def __init__(
+        self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001
+    ):
+        super().__init__(
+            hyperparameters={
+                "learning_rate": learning_rate,
+                "dropout": dropout,
+                "weight_decay": weight_decay,
+                "batch_size": batch_size,
+            }
+        )
         self.model = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
         self.model.classifier[3] = torch.nn.Linear(1280, NUM_CLASSES)
-        
+
+
+class KANCNN(torch.nn.Module):
+    def __init__(self, dropout):
+        super().__init__()
+        self.layers = torch.nn.Sequential(
+            KAN_Convolutional_Layer(
+                in_channels=3, out_channels=32, kernel_size=2, stride=1
+            ),
+            torch.nn.BatchNorm2d(32),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(2),
+            KAN_Convolutional_Layer(
+                in_channels=32, out_channels=64, kernel_size=2, stride=1
+            ),
+            torch.nn.BatchNorm2d(64),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(2),
+            torch.nn.Flatten(),
+            torch.nn.Linear(
+                in_features=64 * _calc_conv_output_size(_calc_conv_output_size()) ** 2,
+                out_features=64,
+            ),
+            torch.nn.BatchNorm1d(64),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(dropout),
+            torch.nn.Linear(in_features=64, out_features=10),
+        )
+
+    def forward(self, x):
+        return self.layers(x)
+
+
+class ModelKAN(Model):
+    def __init__(
+        self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001
+    ):
+        super().__init__(
+            hyperparameters={
+                "learning_rate": learning_rate,
+                "dropout": dropout,
+                "weight_decay": weight_decay,
+                "batch_size": batch_size,
+            }
+        )
+        self.model = KANCNN(dropout)
