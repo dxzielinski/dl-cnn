@@ -3,6 +3,7 @@ import lightning as L
 import torchmetrics
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
+from torchvision.models.inception import inception_v3, Inception_V3_Weights
 
 from model_config import TASK, NUM_CLASSES
 
@@ -171,22 +172,23 @@ default_transforms = transforms.Compose([
 
 class ClassificationData(L.LightningDataModule):
 
-    def __init__(self, data_dir="../data", batch_size=16):
+    def __init__(self, data_dir="../data", batch_size=16, transform=default_transforms):
         super().__init__()
         self.data_dir = data_dir
         self.batch_size = batch_size
+        self.transform = transform
 
     def setup(self, stage=None):
         if stage == "fit":
             self.train_dataset = ImageFolder(
-                root=f"{self.data_dir}/train", transform=default_transforms
+                root=f"{self.data_dir}/train", transform=self.transform
             )
             self.val_dataset = ImageFolder(
-                root=f"{self.data_dir}/valid", transform=default_transforms
+                root=f"{self.data_dir}/valid", transform=self.transform
             )
         if stage == "test":
             self.test_dataset = ImageFolder(
-                root=f"{self.data_dir}/test", transform=default_transforms
+                root=f"{self.data_dir}/test", transform=self.transform
             )
 
     def train_dataloader(self):
@@ -214,3 +216,30 @@ class ClassificationData(L.LightningDataModule):
             shuffle=False,
             num_workers=8,
         )
+        
+
+inception_transforms = transforms.Compose([
+    transforms.Resize((299, 299)),
+    transforms.RandomHorizontalFlip(p=0.5),
+    transforms.RandomVerticalFlip(p=0.5),
+    transforms.RandomRotation(degrees=20),
+    transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
+    transforms.ToTensor(),
+    transforms.RandomErasing(p=0.5, scale=(0.005, 0.01), ratio=(1.2, 1.8)),
+    transforms.Normalize(mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587])
+])
+
+inception_no_augmentation = transforms.Compose([
+    transforms.Resize((299, 299)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587])
+])
+
+class PretrainedModelInception(Model):
+    def __init__(self, learning_rate=0.01, dropout=0.2, weight_decay=0.01):
+        super().__init__(hyperparameters={"learning_rate": learning_rate, "dropout": dropout, "weight_decay": weight_decay})
+        self.model = inception_v3(weights=Inception_V3_Weights.DEFAULT)
+        self.model.aux_logits = False
+        num_features = self.model.fc.in_features
+        self.model.fc = torch.nn.Linear(num_features, NUM_CLASSES)
+            
