@@ -8,6 +8,7 @@ from torchvision.models.mobilenet import mobilenet_v3_large, MobileNet_V3_Large_
 
 from model_config import TASK, NUM_CLASSES
 from kan_convolutional.KANConv import KAN_Convolutional_Layer
+from efficient_kan.kan import KANLinear
 
 
 def _calc_conv_output_size(size=32, kernel_size=2, stride=1, padding=0, pooling_size=2):
@@ -298,17 +299,29 @@ class PretrainedModelMobileNet(Model):
 
 
 class KANCNN(torch.nn.Module):
+    """
+    Due to implementation issues with the KANConvolutionalLayer, this model is not working.
+    """
+
     def __init__(self, dropout):
         super().__init__()
         self.layers = torch.nn.Sequential(
             KAN_Convolutional_Layer(
-                in_channels=3, out_channels=32, kernel_size=2, stride=1
+                in_channels=3,
+                out_channels=32,
+                kernel_size=(2, 2),
+                stride=(1, 1),
+                grid_size=1,
             ),
             torch.nn.BatchNorm2d(32),
             torch.nn.ReLU(),
             torch.nn.MaxPool2d(2),
             KAN_Convolutional_Layer(
-                in_channels=32, out_channels=64, kernel_size=2, stride=1
+                in_channels=32,
+                out_channels=64,
+                kernel_size=(2, 2),
+                stride=(1, 1),
+                grid_size=1,
             ),
             torch.nn.BatchNorm2d(64),
             torch.nn.ReLU(),
@@ -328,7 +341,11 @@ class KANCNN(torch.nn.Module):
         return self.layers(x)
 
 
-class ModelKAN(Model):
+class ModelKANCNN(Model):
+    """
+    Due to implementation issues with the KANConvolutionalLayer, this model is not working.
+    """
+
     def __init__(
         self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001
     ):
@@ -341,3 +358,45 @@ class ModelKAN(Model):
             }
         )
         self.model = KANCNN(dropout)
+
+
+class KANLinearBase(torch.nn.Module):
+    def __init__(self, dropout):
+        super().__init__()
+        self.layers = torch.nn.Sequential(
+            torch.nn.Conv2d(in_channels=3, out_channels=32, kernel_size=2, stride=1),
+            torch.nn.BatchNorm2d(32),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(2),
+            torch.nn.Conv2d(in_channels=32, out_channels=64, kernel_size=2, stride=1),
+            torch.nn.BatchNorm2d(64),
+            torch.nn.ReLU(),
+            torch.nn.MaxPool2d(2),
+            torch.nn.Flatten(),
+            KANLinear(
+                64 * _calc_conv_output_size(_calc_conv_output_size()) ** 2,
+                64,
+            ),
+            torch.nn.BatchNorm1d(64),
+            torch.nn.ReLU(),
+            torch.nn.Dropout(dropout),
+            KANLinear(64, 10),
+        )
+
+    def forward(self, x):
+        return self.layers(x)
+
+
+class ModelKANLinear(Model):
+    def __init__(
+        self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001
+    ):
+        super().__init__(
+            hyperparameters={
+                "learning_rate": learning_rate,
+                "dropout": dropout,
+                "weight_decay": weight_decay,
+                "batch_size": batch_size,
+            }
+        )
+        self.model = KANLinearBase(dropout)
