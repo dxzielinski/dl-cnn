@@ -4,6 +4,7 @@ import torchmetrics
 from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from torchvision.models.inception import inception_v3, Inception_V3_Weights
+from torchvision.models.mobilenet import mobilenet_v3_large, MobileNet_V3_Large_Weights
 
 from model_config import TASK, NUM_CLASSES
 
@@ -169,6 +170,11 @@ default_transforms = transforms.Compose([
     transforms.Normalize(mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587])
 ])
 
+no_augmentation = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587])
+])
+
 
 class ClassificationData(L.LightningDataModule):
 
@@ -235,11 +241,18 @@ inception_no_augmentation = transforms.Compose([
     transforms.Normalize(mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587])
 ])
 
+
 class PretrainedModelInception(Model):
-    def __init__(self, learning_rate=0.01, dropout=0.2, weight_decay=0.01):
-        super().__init__(hyperparameters={"learning_rate": learning_rate, "dropout": dropout, "weight_decay": weight_decay})
+    def __init__(self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001):
+        super().__init__(hyperparameters={"learning_rate": learning_rate, "dropout": dropout, "weight_decay": weight_decay, "batch_size": batch_size})
         self.model = inception_v3(weights=Inception_V3_Weights.DEFAULT)
         self.model.aux_logits = False
         num_features = self.model.fc.in_features
         self.model.fc = torch.nn.Linear(num_features, NUM_CLASSES)
             
+class PretrainedModelMobileNet(Model):
+    def __init__(self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001):
+        super().__init__(hyperparameters={"learning_rate": learning_rate, "dropout": dropout, "weight_decay": weight_decay, "batch_size": batch_size})
+        self.model = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
+        self.model.classifier[3] = torch.nn.Linear(1280, NUM_CLASSES)
+        
