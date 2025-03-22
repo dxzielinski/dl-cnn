@@ -5,6 +5,7 @@ from torchvision import transforms
 from torchvision.datasets import ImageFolder
 from torchvision.models.inception import inception_v3, Inception_V3_Weights
 from torchvision.models.mobilenet import mobilenet_v3_large, MobileNet_V3_Large_Weights
+from torchvision.models.vision_transformer import vit_b_16, ViT_B_16_Weights
 
 from model_config import TASK, NUM_CLASSES
 from kan_convolutional.KANConv import KAN_Convolutional_Layer
@@ -400,3 +401,50 @@ class ModelKANLinear(Model):
             }
         )
         self.model = KANLinearBase(dropout)
+
+
+vit_transforms = transforms.Compose(
+    [
+        transforms.Resize((384, 384)),
+        transforms.RandomHorizontalFlip(p=0.5),
+        transforms.RandomVerticalFlip(p=0.5),
+        transforms.RandomRotation(degrees=20),
+        transforms.ColorJitter(brightness=0.1, contrast=0.1, saturation=0.1, hue=0.05),
+        transforms.ToTensor(),
+        transforms.RandomErasing(p=0.5, scale=(0.005, 0.01), ratio=(1.2, 1.8)),
+        transforms.Normalize(
+            mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587]
+        ),
+    ]
+)
+
+vit_no_augmentation = transforms.Compose(
+    [
+        transforms.Resize((384, 384)),
+        transforms.ToTensor(),
+        transforms.Normalize(
+            mean=[0.4789, 0.4723, 0.4305], std=[0.2421, 0.2383, 0.2587]
+        ),
+    ]
+)
+
+
+class PretrainedVisionTransformer(Model):
+    def __init__(
+        self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001
+    ):
+        super().__init__(
+            hyperparameters={
+                "learning_rate": learning_rate,
+                "dropout": dropout,
+                "weight_decay": weight_decay,
+                "batch_size": batch_size,
+            }
+        )
+        self.model = vit_b_16(weights=ViT_B_16_Weights.IMAGENET1K_SWAG_E2E_V1)
+        self.model.heads.head = torch.nn.Linear(
+            self.model.heads.head.in_features, NUM_CLASSES
+        )
+
+    def forward(self, x):
+        return self.model(x)
