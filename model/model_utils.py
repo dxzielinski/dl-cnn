@@ -6,6 +6,7 @@ from torchvision.datasets import ImageFolder
 from torchvision.models.inception import inception_v3, Inception_V3_Weights
 from torchvision.models.mobilenet import mobilenet_v3_large, MobileNet_V3_Large_Weights
 from torchvision.models.vision_transformer import vit_b_16, ViT_B_16_Weights
+from torchvision.models.efficientnet import efficientnet_v2_s, EfficientNet_V2_S_Weights
 
 from model_config import TASK, NUM_CLASSES
 from kan_convolutional.KANConv import KAN_Convolutional_Layer
@@ -446,5 +447,20 @@ class PretrainedVisionTransformer(Model):
             self.model.heads.head.in_features, NUM_CLASSES
         )
 
-    def forward(self, x):
-        return self.model(x)
+
+class PretrainedEfficientNetV2(Model):
+    def __init__(
+        self, batch_size=64, learning_rate=0.01, dropout=0.2, weight_decay=0.001
+    ):
+        super().__init__(
+            hyperparameters={
+                "learning_rate": learning_rate,
+                "dropout": dropout,
+                "weight_decay": weight_decay,
+                "batch_size": batch_size,
+            }
+        )
+        self.model = efficientnet_v2_s(weights=EfficientNet_V2_S_Weights.IMAGENET1K_V1)
+        self.model.classifier[1] = torch.nn.Linear(
+            self.model.classifier[1].in_features, NUM_CLASSES
+        )
