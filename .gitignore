@@ -179,3 +179,4 @@ data/
 model/mlruns/
 checkpoints/
 Convolutional-KANs/
+data_subset/

@@ -146,8 +146,8 @@ class Model(L.LightningModule):
         self.test_batch_outputs.clear()
 
     def configure_optimizers(self):
-        base_lr = self.learning_rate / 10
-        max_lr = self.learning_rate * 10
+        base_lr = self.learning_rate / 3
+        max_lr = self.learning_rate * 3
         optimizer = torch.optim.AdamW(
             self.model.parameters(),
             lr=self.learning_rate,
