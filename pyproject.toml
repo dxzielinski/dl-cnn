@@ -14,6 +14,7 @@ dependencies = [
     "torchaudio>=2.6.0",
     "lightning>=2.5.0.post0",
     "seaborn>=0.13.2",
+    "ace-tools>=0.0",
 ]
 
 [[tool.uv.index]]
