@@ -1,0 +1,13 @@
+Model,Mean F1 Macro,Runs
+Inception (no aug),0.831,1
+Inception (aug),0.822,1
+EfficientNet (no aug),0.725,1
+MobileNet (no aug),0.671,1
+MobileNet (aug),0.63,1
+KAN Linear (aug),0.569,1
+KAN Linear (no aug),0.569,1
+CNN (no aug),0.569,20
+EfficientNet (aug),0.531,1
+CNN (aug),0.505,208
+CNN Subset (aug),0.447,74
+ViT (aug),0.408,1
